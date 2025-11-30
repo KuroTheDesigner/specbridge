@@ -1,0 +1,7 @@
+{
+  "description": "Client Spec Bridge - AI Powered Discovery",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "name": "SpecBridge"
+}
