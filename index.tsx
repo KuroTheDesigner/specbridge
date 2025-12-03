@@ -270,7 +270,7 @@ function ChatView({ status, questions, onListen, onStop, activeQ, setActiveQ }: 
                             scale: status === "listening" ? 0.95 : 1
                         }}
                     >
-                        {status === "idle" && "Tap to Start\nVision Mode"}
+                        {status === "idle" && "Tell me your vision"}
                         {status === "listening" && "Listening..."}
                         {status === "speaking" && "Speaking..."}
                     </motion.h1>
