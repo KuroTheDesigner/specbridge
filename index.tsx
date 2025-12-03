@@ -43,6 +43,12 @@ function useSpecAgent() {
                 setStatus("listening");
             }
 
+            // Handle disconnection
+            if (msg.connectionState === "disconnected") {
+                setStatus("idle");
+                clientRef.current = null;
+            }
+
             // Handle tool calls
             if (msg.toolCall) {
                 const calls = msg.toolCall.functionCalls;

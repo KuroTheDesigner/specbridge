@@ -6,6 +6,7 @@ const URI = `wss://${HOST}/ws/google.ai.generativelanguage.v1alpha.GenerativeSer
 export class LiveClient {
     ws: WebSocket | null = null;
     audio: AudioStreamer;
+    private msgQueue: string[] = [];
     
     constructor(public apiKey: string, public onUpdate: (msg: any) => void) {
         this.audio = new AudioStreamer();
@@ -18,6 +19,13 @@ export class LiveClient {
         this.ws.onopen = () => {
             console.log("Connected to Gemini Live");
             this.sendSetup(systemInstruction);
+            
+            // Flush queue
+            while (this.msgQueue.length > 0) {
+                const msg = this.msgQueue.shift();
+                if (msg) this.ws?.send(msg);
+            }
+
             // Start mic immediately after connect
             this.audio.startRecording((b64) => this.sendAudio(b64));
         };
@@ -41,10 +49,32 @@ export class LiveClient {
         };
 
         this.ws.onerror = (e) => console.error("WebSocket error", e);
-        this.ws.onclose = () => console.log("WebSocket closed");
+        this.ws.onclose = () => {
+            console.log("WebSocket closed");
+            this.onUpdate({ connectionState: "disconnected" });
+        };
+    }
+
+    private safeSend(data: any) {
+        const msg = JSON.stringify(data);
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(msg);
+        } else {
+            this.msgQueue.push(msg);
+        }
     }
 
     sendSetup(systemInstruction: string) {
+        // Setup must be sent immediately on open, so we bypass the queue check inside connect
+        // But if we call safeSend it will just work if called from onopen.
+        // However, sendSetup is called explicitly in onopen.
+        // Let's keep using this.ws.send in sendSetup if called from onopen, 
+        // OR just use safeSend but ensure it's called when open.
+        
+        // Wait, sendSetup is called inside onopen. So it's safe to send directly.
+        // But to be consistent let's just build the object and use safeSend? 
+        // Actually, sendSetup sends the initial configuration.
+        
         const msg = {
             setup: {
                 model: "models/gemini-2.0-flash-exp",
@@ -78,11 +108,12 @@ export class LiveClient {
                 ]}]
             }
         };
-        this.ws?.send(JSON.stringify(msg));
+        // If called from onopen, readyState is OPEN.
+        this.safeSend(msg);
     }
 
     sendToolResponse(functionCallId: string, name: string, response: any) {
-        const msg = {
+        this.safeSend({
             toolResponse: {
                 functionResponses: [{
                     id: functionCallId,
@@ -90,24 +121,22 @@ export class LiveClient {
                     response: { result: response }
                 }]
             }
-        };
-        this.ws?.send(JSON.stringify(msg));
+        });
     }
 
     sendAudio(b64: string) {
-        const msg = {
+        this.safeSend({
             realtimeInput: {
                 mediaChunks: [{
                     mimeType: "audio/pcm;rate=24000",
                     data: b64
                 }]
             }
-        };
-        this.ws?.send(JSON.stringify(msg));
+        });
     }
 
     sendText(text: string) {
-        const msg = {
+        this.safeSend({
             clientContent: {
                 turns: [{
                     role: "user",
@@ -115,13 +144,13 @@ export class LiveClient {
                 }],
                 turnComplete: true
             }
-        };
-        this.ws?.send(JSON.stringify(msg));
+        });
     }
 
     disconnect() {
         this.ws?.close();
         this.audio.stopRecording();
-        this.ws;
+        this.ws = null;
+        this.msgQueue = [];
     }
 }
