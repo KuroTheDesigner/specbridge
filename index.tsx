@@ -83,10 +83,27 @@ function useSpecAgent() {
         return spec; 
     };
 
+    const sendText = (text: string) => {
+        if (status === "idle") connect();
+        // Small delay to ensure connection if idle
+        setTimeout(() => {
+            clientRef.current?.sendText(text);
+        }, status === "idle" ? 1000 : 0);
+    };
+
+    useEffect(() => {
+        (window as any).specBridgeDebug = {
+            setQuestions,
+            setStatus,
+            setSpec
+        };
+    }, []);
+
     return {
         spec, status, questions, isDevGen,
         toggle: () => status === "idle" ? connect() : disconnect(),
-        generateDevSpec
+        generateDevSpec,
+        sendText
     };
 }
 
@@ -145,9 +162,55 @@ const AudioVisualizer = () => (
     </div>
 );
 
+const TextInput = ({ onSend, className = "" }: { onSend: (text: string) => void, className?: string }) => {
+    const [text, setText] = useState("");
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (text.trim()) {
+            onSend(text);
+            setText("");
+        }
+    };
+    
+    return (
+        <form onSubmit={handleSubmit} className={`text-input-form ${className}`}>
+            <input 
+                type="text" 
+                value={text} 
+                onChange={e => setText(e.target.value)}
+                placeholder="Type your vision..."
+                className="text-input"
+            />
+            <style>{`
+                .text-input-form {
+                    position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
+                    width: 100%; max-width: 400px; z-index: 20;
+                }
+                .text-input-form.card-input {
+                    position: relative; bottom: auto; left: auto; transform: none;
+                    margin-top: 16px;
+                }
+                .text-input {
+                    width: 100%; padding: 12px 20px;
+                    background: rgba(0,0,0,0.5); color: white;
+                    border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
+                    font-family: 'Manrope', sans-serif; font-size: 14px;
+                    backdrop-filter: blur(10px); outline: none;
+                    transition: all 0.2s; text-align: center;
+                }
+                .text-input:focus {
+                    background: rgba(0,0,0,0.7);
+                    border-color: rgba(255,255,255,0.3);
+                    box-shadow: 0 0 20px rgba(255,255,255,0.1);
+                }
+            `}</style>
+        </form>
+    );
+};
+
 // --- Main App ---
 function App() {
-    const { spec, status, questions, toggle, generateDevSpec, isDevGen } = useSpecAgent();
+    const { spec, status, questions, toggle, generateDevSpec, isDevGen, sendText } = useSpecAgent();
     const [view, setView] = useState<"chat"|"spec">("chat");
     const [activeQ, setActiveQ] = useState<string|null>(null);
 
@@ -200,6 +263,7 @@ function App() {
                         onStop={toggle}
                         activeQ={activeQ}
                         setActiveQ={setActiveQ}
+                        onSend={sendText}
                     />
                 ) : (
                     <SpecView 
@@ -248,7 +312,7 @@ function App() {
 }
 
 // --- Chat / Interaction View ---
-function ChatView({ status, questions, onListen, onStop, activeQ, setActiveQ }: any) {
+function ChatView({ status, questions, onListen, onStop, activeQ, setActiveQ, onSend }: any) {
     const isBento = status === "bento" || (questions.length > 0 && !activeQ);
     
     return (
@@ -289,6 +353,11 @@ function ChatView({ status, questions, onListen, onStop, activeQ, setActiveQ }: 
                         )}
                     </motion.button>
                 </div>
+            )}
+            
+            {/* Text Input Fallback */}
+            {!isBento && !activeQ && (
+                <TextInput onSend={onSend} />
             )}
 
             {/* Bento Grid Layer */}
@@ -340,6 +409,17 @@ function ChatView({ status, questions, onListen, onStop, activeQ, setActiveQ }: 
                                                     <button className={`record-btn ${status === 'listening' ? 'rec' : ''}`}>
                                                         <Icons.Mic active={status === 'listening'} />
                                                     </button>
+                                                </div>
+                                            )}
+                                            {isActive && (
+                                                <div className="card-text-input" onClick={e => e.stopPropagation()}>
+                                                    <TextInput 
+                                                        className="card-input"
+                                                        onSend={(text) => {
+                                                            onSend(text);
+                                                            // Optionally advance or close, for now we just send
+                                                        }} 
+                                                    />
                                                 </div>
                                             )}
                                             {isActive && (
