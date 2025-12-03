@@ -47,13 +47,48 @@ export class LiveClient {
     sendSetup(systemInstruction: string) {
         const msg = {
             setup: {
-                model: "models/gemini-2.0-flash-exp", // Using the flash-exp model which supports Live
+                model: "models/gemini-2.0-flash-exp",
                 generationConfig: {
-                    responseModalities: ["AUDIO"] 
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } }
+                    }
                 },
                 systemInstruction: {
                     parts: [{ text: systemInstruction }]
-                }
+                },
+                tools: [{ functionDeclarations: [
+                    {
+                        name: "updateSpec",
+                        description: "Update the design brief.",
+                        parameters: { type: "OBJECT", properties: { content: { type: "STRING" } }, required: ["content"] }
+                    },
+                    {
+                        name: "askFollowUpQuestions",
+                        description: "Propose strategic questions.",
+                        parameters: { 
+                            type: "OBJECT", 
+                            properties: { 
+                                intro: { type: "STRING" },
+                                qs: { type: "ARRAY", items: { type: "STRING" } }
+                            }, 
+                            required: ["intro", "qs"] 
+                        }
+                    }
+                ]}]
+            }
+        };
+        this.ws?.send(JSON.stringify(msg));
+    }
+
+    sendToolResponse(functionCallId: string, name: string, response: any) {
+        const msg = {
+            toolResponse: {
+                functionResponses: [{
+                    id: functionCallId,
+                    name: name,
+                    response: { result: response }
+                }]
             }
         };
         this.ws?.send(JSON.stringify(msg));
