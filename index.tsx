@@ -31,11 +31,13 @@ function useSpecAgent() {
     const [questions, setQuestions] = useState<{id:string, text:string, answered:boolean}[]>([]);
     const [status, setStatus] = useState<"idle"|"listening"|"speaking">("idle");
     const [isDevGen, setIsDevGen] = useState(false);
+    const [error, setError] = useState<string|null>(null);
     
     const clientRef = useRef<LiveClient | null>(null);
 
     const connect = () => {
         if (clientRef.current) return;
+        setError(null);
         
         const client = new LiveClient(API_KEY, (msg) => {
             // Handle turn completion
@@ -47,6 +49,7 @@ function useSpecAgent() {
             if (msg.connectionState === "disconnected") {
                 setStatus("idle");
                 clientRef.current = null;
+                if (msg.error) setError(msg.error);
             }
 
             // Handle tool calls
@@ -106,7 +109,7 @@ function useSpecAgent() {
     }, []);
 
     return {
-        spec, status, questions, isDevGen,
+        spec, status, questions, isDevGen, error,
         toggle: () => status === "idle" ? connect() : disconnect(),
         generateDevSpec,
         sendText
@@ -216,7 +219,7 @@ const TextInput = ({ onSend, className = "" }: { onSend: (text: string) => void,
 
 // --- Main App ---
 function App() {
-    const { spec, status, questions, toggle, generateDevSpec, isDevGen, sendText } = useSpecAgent();
+    const { spec, status, questions, toggle, generateDevSpec, isDevGen, sendText, error } = useSpecAgent();
     const [view, setView] = useState<"chat"|"spec">("chat");
     const [activeQ, setActiveQ] = useState<string|null>(null);
 
@@ -257,6 +260,12 @@ function App() {
                     <Icons.Doc />
                 </button>
             </motion.header>
+
+            {error && (
+                <div className="error-toast">
+                    {error}
+                </div>
+            )}
 
             {/* Main Stage */}
             <AnimatePresence mode="wait">
@@ -312,6 +321,12 @@ function App() {
                 }
                 .icon-btn:hover { background: rgba(255,255,255,0.1); }
                 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+                .error-toast {
+                    position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+                    background: #FF3300; color: white; padding: 8px 16px;
+                    border-radius: 20px; font-family: 'Manrope'; font-size: 12px;
+                    z-index: 100;
+                }
             `}</style>
         </div>
     );

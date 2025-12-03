@@ -49,9 +49,17 @@ export class LiveClient {
         };
 
         this.ws.onerror = (e) => console.error("WebSocket error", e);
-        this.ws.onclose = () => {
-            console.log("WebSocket closed");
-            this.onUpdate({ connectionState: "disconnected" });
+        this.ws.onclose = (event) => {
+            console.log(`WebSocket closed: Code=${event.code}, Reason=${event.reason}`);
+            let errorMsg = "Connection closed";
+            if (event.code === 1011) {
+                if (event.reason.includes("quota")) {
+                    errorMsg = "Quota exceeded. Please check billing.";
+                } else {
+                    errorMsg = "Server error: " + event.reason;
+                }
+            }
+            this.onUpdate({ connectionState: "disconnected", error: errorMsg });
         };
     }
 
