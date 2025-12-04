@@ -85,7 +85,7 @@ export class LiveClient {
         
         const msg = {
             setup: {
-                model: "models/gemini-2.0-flash-exp",
+                model: "models/gemini-live-2.5-flash-preview",
                 generationConfig: {
                     responseModalities: ["AUDIO"],
                     speechConfig: {
